@@ -110,45 +110,6 @@ if st.sidebar.button("Predict"):
     else:
         st.warning("Please provide applicant data (manual entry or CSV).")
 
-
-        # SHAP explanation
-st.subheader("SHAP Explanation")
-
-explainer = shap.Explainer(mlp_model.predict, scaler.transform(df.drop("default_ind", axis=1)))
-shap_values = explainer(scaled)
-
-# Plot SHAP
-st.subheader("SHAP Explanation")
-fig, ax = plt.subplots()
-shap.summary_plot(shap_values, applicant_aligned, feature_names=feature_names, plot_type="bar", show=False)
-st.pyplot(fig)
-
-# Use matplotlib backend for Streamlit
-fig, ax = plt.subplots()
-shap.summary_plot(shap_values, applicant_data, feature_names=applicant_data.columns, plot_type="bar", show=False)
-st.pyplot(fig)
-
-
-       # LIME explanation
-st.subheader("LIME Explanation")
-
-lime_explainer = lime.lime_tabular.LimeTabularExplainer(
-    training_data=scaler.transform(df.drop("default_ind", axis=1).values),
-    feature_names=df.drop("default_ind", axis=1).columns.tolist(),
-    class_names=["Non-Default", "Default"],
-    mode="classification"
-)
-
-explanation = lime_explainer.explain_instance(
-    data_row=scaled[0],
-    predict_fn=mlp_model.predict_proba,
-    num_features=4
-)
-
-# Convert to matplotlib figure for Streamlit
-fig = explanation.as_pyplot_figure(label=1)
-st.pyplot(fig)
-
 # Retrain option
 if st.sidebar.button("Retrain Model"):
     from sklearn.neural_network import MLPClassifier
@@ -166,6 +127,7 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 
 
 

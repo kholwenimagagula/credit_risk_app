@@ -33,6 +33,13 @@ if input_mode == "Manual Entry":
         "loan_amount": [loan_amount],
         "credit_score": [credit_score]
     })
+    # Align applicant data to training features
+applicant_aligned = pd.DataFrame(columns=feature_names)
+applicant_aligned.loc[0] = 0  # initialize with zeros
+for col in applicant_data.columns:
+    if col in applicant_aligned.columns:
+        applicant_aligned.loc[0, col] = applicant_data[col].values[0]
+
 
 elif input_mode == "Upload CSV":
     uploaded_file = st.sidebar.file_uploader("Upload Applicant CSV", type=["csv"])
@@ -44,7 +51,7 @@ elif input_mode == "Upload CSV":
 # Predict button
 if st.sidebar.button("Predict"):
     if applicant_data is not None:
-        scaled = scaler.transform(applicant_data)
+        scaled = scaler.transform(applicant_aligned)
         prob = mlp_model.predict_proba(scaled)[:, 1]
         pred = mlp_model.predict(scaled)
 
@@ -77,7 +84,13 @@ if st.sidebar.button("Predict"):
 st.subheader("SHAP Explanation")
 
 explainer = shap.Explainer(mlp_model.predict, scaler.transform(df.drop("default_ind", axis=1)))
-shap_values = explainer(scaler.transform(applicant_data))
+shap_values = explainer(scaled)
+
+# Plot SHAP
+st.subheader("SHAP Explanation")
+fig, ax = plt.subplots()
+shap.summary_plot(shap_values, applicant_aligned, feature_names=feature_names, plot_type="bar", show=False)
+st.pyplot(fig)
 
 # Use matplotlib backend for Streamlit
 fig, ax = plt.subplots()
@@ -96,7 +109,7 @@ lime_explainer = lime.lime_tabular.LimeTabularExplainer(
 )
 
 explanation = lime_explainer.explain_instance(
-    data_row=scaler.transform(applicant_data.values)[0],
+    data_row=scaled[0],
     predict_fn=mlp_model.predict_proba,
     num_features=4
 )
@@ -122,5 +135,6 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 
 

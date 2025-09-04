@@ -51,11 +51,21 @@ for col in applicant_data.columns:
 # Predict button
 if st.sidebar.button("Predict"):
     if applicant_data is not None:
+        # Align applicant data with training features
+        applicant_aligned = pd.DataFrame(columns=feature_names)
+        applicant_aligned.loc[0] = 0
+        for col in applicant_data.columns:
+            if col in applicant_aligned.columns:
+                applicant_aligned.loc[0, col] = applicant_data[col].values[0]
+
+        # Scale aligned data
         scaled = scaler.transform(applicant_aligned)
+
+        # Prediction
         prob = mlp_model.predict_proba(scaled)[:, 1]
         pred = mlp_model.predict(scaled)
 
-        # Risk categories
+        # Results
         results = []
         for i in range(len(prob)):
             if prob[i] > 0.7:
@@ -74,11 +84,32 @@ if st.sidebar.button("Predict"):
         st.subheader("Prediction Results")
         st.write(results_df)
 
-        # Append applicant(s) to dataset and save
-        new_data = applicant_data.copy()
-        new_data["default_ind"] = pred
-        df_updated = pd.concat([df, new_data], ignore_index=True)
-        df_updated.to_csv("credit_risk_dataset.csv", index=False)
+        # ✅ SHAP Explanation (now inside the same block)
+        st.subheader("SHAP Explanation")
+        explainer = shap.Explainer(mlp_model.predict, scaler.transform(df.drop("default_ind", axis=1)))
+        shap_values = explainer(scaled)
+        fig, ax = plt.subplots()
+        shap.summary_plot(shap_values, applicant_aligned, feature_names=feature_names, plot_type="bar", show=False)
+        st.pyplot(fig)
+
+        # ✅ LIME Explanation (also inside the block)
+        st.subheader("LIME Explanation")
+        lime_explainer = lime.lime_tabular.LimeTabularExplainer(
+            training_data=scaler.transform(df.drop("default_ind", axis=1).values),
+            feature_names=df.drop("default_ind", axis=1).columns.tolist(),
+            class_names=["Non-Default", "Default"],
+            mode="classification"
+        )
+        explanation = lime_explainer.explain_instance(
+            data_row=scaled[0],
+            predict_fn=mlp_model.predict_proba,
+            num_features=4
+        )
+        fig = explanation.as_pyplot_figure(label=1)
+        st.pyplot(fig)
+    else:
+        st.warning("Please provide applicant data (manual entry or CSV).")
+
 
         # SHAP explanation
 st.subheader("SHAP Explanation")
@@ -135,6 +166,7 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 
 
 

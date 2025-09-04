@@ -7,10 +7,11 @@ import lime.lime_tabular
 import matplotlib.pyplot as plt
 import os
 
-# Load model, scaler, dataset
+# Load model, scaler, dataset, and feature names
 mlp_model = joblib.load("mlp_model.pkl")
 scaler = joblib.load("scaler.pkl")
 df = pd.read_csv("credit_risk_dataset.csv")
+feature_names = joblib.load("features.pkl")
 
 st.title("📊 Credit Risk Assessment Tool")
 
@@ -121,4 +122,5 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 

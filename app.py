@@ -7,6 +7,94 @@ import lime.lime_tabular
 import matplotlib.pyplot as plt
 import os
 
+import streamlit_authenticator as stauth
+import yaml
+from yaml.loader import SafeLoader
+
+# --- User Authentication ---
+# Example user database (this can later be replaced by a proper DB)
+config = {
+    'credentials': {
+        'usernames': {
+            'user1': {
+                'email': 'user1@email.com',
+                'name': 'User One',
+                'password': '12345'   # ⚠️ In production, hash this
+            },
+            'user2': {
+                'email': 'user2@email.com',
+                'name': 'User Two',
+                'password': '67890'
+            }
+        }
+    },
+    'cookie': {
+        'name': 'credit_risk_cookie',
+        'key': 'signature_key123',
+        'expiry_days': 30
+    },
+    'preauthorized': {
+        'emails': []
+    }
+}
+
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days']
+)
+
+name, authentication_status, username = authenticator.login("Login", "main")
+
+if authentication_status == False:
+    st.error("Username/password is incorrect")
+elif authentication_status == None:
+    st.warning("Please enter your email and password")
+elif authentication_status:
+    st.success(f"Welcome {name}!")
+    authenticator.logout("Logout", "sidebar")
+
+def ai_assistant(pred, prob, shap_values, lime_exp, applicant_aligned):
+    explanation_text = ""
+
+    # 1. Prediction summary
+    if pred[0] == 1:
+        explanation_text += f"⚠️ The model predicts this applicant is at HIGH RISK of default with probability {prob[0]:.2f}.\n\n"
+    else:
+        explanation_text += f"✅ The model predicts this applicant is at LOW RISK of default with probability {prob[0]:.2f}.\n\n"
+
+    # 2. SHAP Insights
+    explanation_text += "📊 **SHAP Insights:**\n"
+    important_features = shap_values.values[0].argsort()[-3:][::-1]  # top 3
+    for i in important_features:
+        feature = applicant_aligned.columns[i]
+        value = applicant_aligned.iloc[0, i]
+        shap_val = shap_values.values[0][i]
+        explanation_text += f"- {feature} = {value} contributed {'positively' if shap_val > 0 else 'negatively'} to the risk score.\n"
+
+    # 3. LIME Insights
+    explanation_text += "\n📌 **LIME Explanation:**\n"
+    for feature, weight in lime_exp.as_list(label=1):
+        explanation_text += f"- {feature} with weight {weight:.2f}\n"
+
+    # 4. Policy & Loan Advice
+    explanation_text += "\n💡 **Policy Recommendations:**\n"
+    if pred[0] == 0:  # Non-default
+        explanation_text += "- The applicant qualifies for a personal loan.\n"
+        if prob[0] < 0.3:
+            explanation_text += "- Recommended: Higher loan amount with longer repayment period (24–36 months).\n"
+        elif prob[0] < 0.6:
+            explanation_text += "- Recommended: Medium loan amount with repayment period of 12–24 months.\n"
+        else:
+            explanation_text += "- Recommended: Lower loan amount with strict monitoring and shorter repayment period (6–12 months).\n"
+    else:
+        explanation_text += "- The applicant should be carefully monitored or rejected due to high risk of default.\n"
+        explanation_text += "- Recommend financial literacy training or credit repair program before loan approval.\n"
+
+    return explanation_text
+
+
 # Load model, scaler, dataset, and feature names
 mlp_model = joblib.load("mlp_model.pkl")
 scaler = joblib.load("scaler.pkl")
@@ -107,8 +195,14 @@ if st.sidebar.button("Predict"):
         )
         fig = explanation.as_pyplot_figure(label=1)
         st.pyplot(fig)
+        # AI Assistant Explanation
+st.subheader("🤖 AI Assistant Advice")
+assistant_text = ai_assistant(pred, prob, shap_values, explanation, applicant_aligned)
+st.write(assistant_text)
+
     else:
         st.warning("Please provide applicant data (manual entry or CSV).")
+   
 
 # Retrain option
 if st.sidebar.button("Retrain Model"):
@@ -127,6 +221,7 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 
 
 

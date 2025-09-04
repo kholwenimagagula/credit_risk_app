@@ -62,14 +62,16 @@ elif (0, 3, 0) <= version < (0, 4, 0):
     username = name  # no separate username
 
 else:
-    # New API (>=0.4.0): returns only authentication_status
-    authentication_status = authenticator.login("Login", location="sidebar")
-    if authentication_status:
-        user_info = authenticator.get_user_info()
-        name = user_info.get("name")
-        username = user_info.get("username")
-    else:
-        name, username = None, None
+# New API (>=0.4.0)
+with st.sidebar:
+    authentication_status = authenticator.login("Login")
+
+if authentication_status:
+    user_info = authenticator.get_user_info()
+    name = user_info.get("name")
+    username = user_info.get("username")
+else:
+    name, username = None, None
 
 # --- Authentication UI ---
 if authentication_status is False:
@@ -78,7 +80,9 @@ elif authentication_status is None:
     st.warning("Please enter your email and password")
 elif authentication_status:
     st.success(f"Welcome {name}!")
-    authenticator.logout("Logout", location="sidebar")
+    with st.sidebar:
+        authenticator.logout("Logout")
+
 
 # -------------------- AI ASSISTANT FUNCTION --------------------
 def ai_assistant(pred, prob, shap_values, lime_exp, applicant_aligned):
@@ -239,6 +243,7 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 
 
 

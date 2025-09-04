@@ -6,3 +6,5 @@ matplotlib
 seaborn
 shap
 lime
+streamlit-authenticator
+

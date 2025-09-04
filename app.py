@@ -199,7 +199,6 @@ if st.sidebar.button("Predict"):
 st.subheader("🤖 AI Assistant Advice")
 assistant_text = ai_assistant(pred, prob, shap_values, explanation, applicant_aligned)
 st.write(assistant_text)
-
     else:
         st.warning("Please provide applicant data (manual entry or CSV).")
    
@@ -221,6 +220,7 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 
 
 

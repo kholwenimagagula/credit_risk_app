@@ -136,7 +136,7 @@ for col in applicant_data.columns:
     if col in applicant_aligned.columns:
         applicant_aligned.loc[0, col] = applicant_data[col].values[0]
 
-# Predict button
+# -------------------- PREDICT BUTTON --------------------
 if st.sidebar.button("Predict"):
     if applicant_data is not None:
         # Align applicant data with training features
@@ -172,7 +172,7 @@ if st.sidebar.button("Predict"):
         st.subheader("Prediction Results")
         st.write(results_df)
 
-        # ✅ SHAP Explanation (now inside the same block)
+        # ✅ SHAP Explanation
         st.subheader("SHAP Explanation")
         explainer = shap.Explainer(mlp_model.predict, scaler.transform(df.drop("default_ind", axis=1)))
         shap_values = explainer(scaled)
@@ -180,7 +180,7 @@ if st.sidebar.button("Predict"):
         shap.summary_plot(shap_values, applicant_aligned, feature_names=feature_names, plot_type="bar", show=False)
         st.pyplot(fig)
 
-        # ✅ LIME Explanation (also inside the block)
+        # ✅ LIME Explanation
         st.subheader("LIME Explanation")
         lime_explainer = lime.lime_tabular.LimeTabularExplainer(
             training_data=scaler.transform(df.drop("default_ind", axis=1).values),
@@ -195,7 +195,17 @@ if st.sidebar.button("Predict"):
         )
         fig = explanation.as_pyplot_figure(label=1)
         st.pyplot(fig)
-      def ai_assistant(pred, prob, shap_values, lime_exp, applicant_aligned):
+
+        # ✅ AI Assistant Advice
+        st.subheader("🤖 AI Assistant Advice")
+        assistant_text = ai_assistant(pred, prob, shap_values, explanation, applicant_aligned)
+        st.write(assistant_text)
+
+    else:
+        st.warning("Please provide applicant data (manual entry or CSV).")
+
+# -------------------- AI ASSISTANT FUNCTION --------------------
+def ai_assistant(pred, prob, shap_values, lime_exp, applicant_aligned):
     explanation_text = ""
 
     # 1. Prediction summary
@@ -234,8 +244,6 @@ if st.sidebar.button("Predict"):
 
     return explanation_text
 
-    else:
-        st.warning("Please provide applicant data (manual entry or CSV).")
    
 
 # Retrain option
@@ -255,6 +263,7 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 
 
 

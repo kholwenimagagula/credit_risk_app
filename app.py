@@ -43,7 +43,7 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days']
 )
 
-name, authentication_status, username = authenticator.login("Login", location="sidebar")
+name, authentication_status = authenticator.login("Login", location="sidebar")
 
 if authentication_status is False:
     st.error("Username/password is incorrect")
@@ -212,6 +212,7 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 
 
 

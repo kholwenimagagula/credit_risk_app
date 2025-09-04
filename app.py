@@ -54,7 +54,7 @@ elif authentication_status == None:
     st.warning("Please enter your email and password")
 elif authentication_status:
     st.success(f"Welcome {name}!")
-    authenticator.logout("Logout", "sidebar")
+    authenticator.logout("Logout", location="sidebar")
 
 
 def ai_assistant(pred, prob, shap_values, lime_exp, applicant_aligned):
@@ -265,6 +265,7 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 
 
 

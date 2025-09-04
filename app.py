@@ -11,15 +11,16 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 
+import streamlit_authenticator as stauth
+
 # --- User Authentication ---
-# Example user database (this can later be replaced by a proper DB)
 config = {
     'credentials': {
         'usernames': {
             'user1': {
                 'email': 'user1@email.com',
                 'name': 'User One',
-                'password': '12345'   # ⚠️ In production, hash this
+                'password': '12345'   # ⚠️ In production, hash passwords
             },
             'user2': {
                 'email': 'user2@email.com',
@@ -45,7 +46,7 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days']
 )
 
-name, authentication_status, username = authenticator.login("Login", "main")
+name, authentication_status, username = authenticator.login("Login", "sidebar")
 
 if authentication_status == False:
     st.error("Username/password is incorrect")
@@ -54,6 +55,7 @@ elif authentication_status == None:
 elif authentication_status:
     st.success(f"Welcome {name}!")
     authenticator.logout("Logout", "sidebar")
+
 
 def ai_assistant(pred, prob, shap_values, lime_exp, applicant_aligned):
     explanation_text = ""
@@ -263,6 +265,7 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 
 
 

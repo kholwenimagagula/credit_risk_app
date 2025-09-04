@@ -8,6 +8,14 @@ import matplotlib.pyplot as plt
 
 import streamlit as st
 import streamlit_authenticator as stauth
+import importlib.metadata
+
+# --- Detect streamlit-authenticator version ---
+try:
+    version_str = importlib.metadata.version("streamlit-authenticator")
+    version = tuple(map(int, version_str.split(".")))
+except Exception:
+    version = (0, 0, 0)  # fallback if version can't be detected
 
 # --- User Authentication Config ---
 config = {
@@ -16,7 +24,7 @@ config = {
             'user1': {
                 'email': 'user1@email.com',
                 'name': 'User One',
-                'password': '12345'   # ⚠️ use hashed in production
+                'password': '12345'   # ⚠️ hash in production
             },
             'user2': {
                 'email': 'user2@email.com',
@@ -44,8 +52,6 @@ authenticator = stauth.Authenticate(
 )
 
 # --- Handle different return signatures based on version ---
-version = tuple(map(int, stauth.__version__.split(".")))
-
 if version < (0, 3, 0):
     # Old API: returns (name, authentication_status, username)
     name, authentication_status, username = authenticator.login("Login", location="sidebar")
@@ -233,6 +239,7 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 
 
 

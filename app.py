@@ -6,18 +6,17 @@ import shap
 import lime.lime_tabular
 import matplotlib.pyplot as plt
 
+import streamlit as st
 import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
 
-# --- User Authentication ---
+# --- User Authentication Config ---
 config = {
     'credentials': {
         'usernames': {
             'user1': {
                 'email': 'user1@email.com',
                 'name': 'User One',
-                'password': '12345'   # ⚠️ In production, hash passwords
+                'password': '12345'   # ⚠️ use hashed in production
             },
             'user2': {
                 'email': 'user2@email.com',
@@ -36,6 +35,7 @@ config = {
     }
 }
 
+# Create authenticator
 authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],
@@ -43,8 +43,29 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days']
 )
 
-name, authentication_status = authenticator.login("Login", location="sidebar")
+# --- Handle different return signatures based on version ---
+version = tuple(map(int, stauth.__version__.split(".")))
 
+if version < (0, 3, 0):
+    # Old API: returns (name, authentication_status, username)
+    name, authentication_status, username = authenticator.login("Login", location="sidebar")
+
+elif (0, 3, 0) <= version < (0, 4, 0):
+    # Mid API: returns (name, authentication_status)
+    name, authentication_status = authenticator.login("Login", location="sidebar")
+    username = name  # no separate username
+
+else:
+    # New API (>=0.4.0): returns only authentication_status
+    authentication_status = authenticator.login("Login", location="sidebar")
+    if authentication_status:
+        user_info = authenticator.get_user_info()
+        name = user_info.get("name")
+        username = user_info.get("username")
+    else:
+        name, username = None, None
+
+# --- Authentication UI ---
 if authentication_status is False:
     st.error("Username/password is incorrect")
 elif authentication_status is None:
@@ -212,6 +233,7 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 
 
 

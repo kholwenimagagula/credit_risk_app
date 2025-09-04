@@ -5,13 +5,10 @@ import joblib
 import shap
 import lime.lime_tabular
 import matplotlib.pyplot as plt
-import os
 
 import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
-
-import streamlit_authenticator as stauth
 
 # --- User Authentication ---
 config = {
@@ -46,17 +43,17 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days']
 )
 
-name, authentication_status, username = authenticator.login("Login", "sidebar")
+name, authentication_status, username = authenticator.login("Login", location="sidebar")
 
-if authentication_status == False:
+if authentication_status is False:
     st.error("Username/password is incorrect")
-elif authentication_status == None:
+elif authentication_status is None:
     st.warning("Please enter your email and password")
 elif authentication_status:
     st.success(f"Welcome {name}!")
     authenticator.logout("Logout", location="sidebar")
 
-
+# -------------------- AI ASSISTANT FUNCTION --------------------
 def ai_assistant(pred, prob, shap_values, lime_exp, applicant_aligned):
     explanation_text = ""
 
@@ -111,6 +108,7 @@ st.sidebar.header("Applicant Data Input")
 # Choose input mode
 input_mode = st.sidebar.radio("Choose input mode:", ["Manual Entry", "Upload CSV"])
 
+applicant_data = None
 if input_mode == "Manual Entry":
     income = st.sidebar.number_input("Income", min_value=0.0, step=100.0)
     age = st.sidebar.number_input("Age", min_value=18, max_value=100, step=1)
@@ -128,15 +126,6 @@ elif input_mode == "Upload CSV":
     uploaded_file = st.sidebar.file_uploader("Upload Applicant CSV", type=["csv"])
     if uploaded_file:
         applicant_data = pd.read_csv(uploaded_file)
-    else:
-        applicant_data = None
-        
-    # Align applicant data to training features
-applicant_aligned = pd.DataFrame(columns=feature_names)
-applicant_aligned.loc[0] = 0  # initialize with zeros
-for col in applicant_data.columns:
-    if col in applicant_aligned.columns:
-        applicant_aligned.loc[0, col] = applicant_data[col].values[0]
 
 # -------------------- PREDICT BUTTON --------------------
 if st.sidebar.button("Predict"):
@@ -206,49 +195,7 @@ if st.sidebar.button("Predict"):
     else:
         st.warning("Please provide applicant data (manual entry or CSV).")
 
-# -------------------- AI ASSISTANT FUNCTION --------------------
-def ai_assistant(pred, prob, shap_values, lime_exp, applicant_aligned):
-    explanation_text = ""
-
-    # 1. Prediction summary
-    if pred[0] == 1:
-        explanation_text += f"⚠️ The model predicts this applicant is at HIGH RISK of default with probability {prob[0]:.2f}.\n\n"
-    else:
-        explanation_text += f"✅ The model predicts this applicant is at LOW RISK of default with probability {prob[0]:.2f}.\n\n"
-
-    # 2. SHAP Insights
-    explanation_text += "📊 **SHAP Insights:**\n"
-    important_features = shap_values.values[0].argsort()[-3:][::-1]  # top 3
-    for i in important_features:
-        feature = applicant_aligned.columns[i]
-        value = applicant_aligned.iloc[0, i]
-        shap_val = shap_values.values[0][i]
-        explanation_text += f"- {feature} = {value} contributed {'positively' if shap_val > 0 else 'negatively'} to the risk score.\n"
-
-    # 3. LIME Insights
-    explanation_text += "\n📌 **LIME Explanation:**\n"
-    for feature, weight in lime_exp.as_list(label=1):
-        explanation_text += f"- {feature} with weight {weight:.2f}\n"
-
-    # 4. Policy & Loan Advice
-    explanation_text += "\n💡 **Policy Recommendations:**\n"
-    if pred[0] == 0:  # Non-default
-        explanation_text += "- The applicant qualifies for a personal loan.\n"
-        if prob[0] < 0.3:
-            explanation_text += "- Recommended: Higher loan amount with longer repayment period (24–36 months).\n"
-        elif prob[0] < 0.6:
-            explanation_text += "- Recommended: Medium loan amount with repayment period of 12–24 months.\n"
-        else:
-            explanation_text += "- Recommended: Lower loan amount with strict monitoring and shorter repayment period (6–12 months).\n"
-    else:
-        explanation_text += "- The applicant should be carefully monitored or rejected due to high risk of default.\n"
-        explanation_text += "- Recommend financial literacy training or credit repair program before loan approval.\n"
-
-    return explanation_text
-
-   
-
-# Retrain option
+# -------------------- RETRAIN OPTION --------------------
 if st.sidebar.button("Retrain Model"):
     from sklearn.neural_network import MLPClassifier
 
@@ -265,6 +212,8 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
+
 
 
 

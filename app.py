@@ -6,87 +6,6 @@ import shap
 import lime.lime_tabular
 import matplotlib.pyplot as plt
 
-import streamlit as st
-import streamlit_authenticator as stauth
-import importlib.metadata
-
-# --- Detect streamlit-authenticator version ---
-try:
-    version_str = importlib.metadata.version("streamlit-authenticator")
-    version = tuple(map(int, version_str.split(".")))
-except Exception:
-    version = (0, 0, 0)  # fallback if version can't be detected
-
-# --- User Authentication Config ---
-config = {
-    'credentials': {
-        'usernames': {
-            'user1': {
-                'email': 'user1@email.com',
-                'name': 'User One',
-                'password': '12345'   # ⚠️ hash in production
-            },
-            'user2': {
-                'email': 'user2@email.com',
-                'name': 'User Two',
-                'password': '67890'
-            }
-        }
-    },
-    'cookie': {
-        'name': 'credit_risk_cookie',
-        'key': 'signature_key123',
-        'expiry_days': 30
-    },
-    'preauthorized': {
-        'emails': []
-    }
-}
-
-# Create authenticator
-authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days']
-)
-
-# --- Handle API differences ---
-if version < (0, 3, 0):
-    # Old API: returns (name, authentication_status, username)
-    name, authentication_status, username = authenticator.login("Login", location="sidebar")
-
-elif (0, 3, 0) <= version < (0, 4, 0):
-    # Mid API: returns (name, authentication_status)
-    name, authentication_status = authenticator.login("Login", location="sidebar")
-    username = name
-
-else:
-    # New API (>=0.4.0): no location argument, only returns authentication_status
-    with st.sidebar:
-        authentication_status = authenticator.login("Login")
-    if authentication_status:
-        user_info = authenticator.get_user_info()
-        name = user_info.get("name")
-        username = user_info.get("username")
-    else:
-        name, username = None, None
-
-# --- Authentication UI ---
-if authentication_status is False:
-    st.error("Username/password is incorrect")
-elif authentication_status is None:
-    st.warning("Please enter your email and password")
-elif authentication_status:
-    st.success(f"Welcome {name}!")
-    if version < (0, 4, 0):
-        authenticator.logout("Logout", location="sidebar")
-    else:
-        with st.sidebar:
-            authenticator.logout("Logout")
-
-
-
 # -------------------- AI ASSISTANT FUNCTION --------------------
 def ai_assistant(pred, prob, shap_values, lime_exp, applicant_aligned):
     explanation_text = ""
@@ -246,6 +165,8 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
+
 
 
 

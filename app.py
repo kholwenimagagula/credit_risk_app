@@ -33,13 +33,6 @@ if input_mode == "Manual Entry":
         "loan_amount": [loan_amount],
         "credit_score": [credit_score]
     })
-    # Align applicant data to training features
-applicant_aligned = pd.DataFrame(columns=feature_names)
-applicant_aligned.loc[0] = 0  # initialize with zeros
-for col in applicant_data.columns:
-    if col in applicant_aligned.columns:
-        applicant_aligned.loc[0, col] = applicant_data[col].values[0]
-
 
 elif input_mode == "Upload CSV":
     uploaded_file = st.sidebar.file_uploader("Upload Applicant CSV", type=["csv"])
@@ -47,6 +40,13 @@ elif input_mode == "Upload CSV":
         applicant_data = pd.read_csv(uploaded_file)
     else:
         applicant_data = None
+        
+    # Align applicant data to training features
+applicant_aligned = pd.DataFrame(columns=feature_names)
+applicant_aligned.loc[0] = 0  # initialize with zeros
+for col in applicant_data.columns:
+    if col in applicant_aligned.columns:
+        applicant_aligned.loc[0, col] = applicant_data[col].values[0]
 
 # Predict button
 if st.sidebar.button("Predict"):
@@ -135,6 +135,7 @@ if st.sidebar.button("Retrain Model"):
     joblib.dump(scaler, "scaler.pkl")
 
     st.success("Model retrained successfully with updated dataset!")
+
 
 
 

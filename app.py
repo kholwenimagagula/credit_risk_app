@@ -5,64 +5,99 @@ import joblib
 import shap
 import lime.lime_tabular
 import matplotlib.pyplot as plt
-import io
 
-# --- Load Model and Data ---
+# -------------------- AI ASSISTANT FUNCTION --------------------
+def ai_assistant(pred, prob, shap_values, lime_exp, applicant_aligned):
+    explanation_text = ""
+
+    # 1. Prediction summary
+    if pred[0] == 1:
+        explanation_text += f"⚠️ The model predicts this applicant is at HIGH RISK of default with probability {prob[0]:.2f}.\n\n"
+    else:
+        explanation_text += f"✅ The model predicts this applicant is at LOW RISK of default with probability {prob[0]:.2f}.\n\n"
+
+    # 2. SHAP Insights
+    explanation_text += "📊 **SHAP Insights:**\n"
+    important_features = shap_values.values[0].argsort()[-3:][::-1]  # top 3
+    for i in important_features:
+        feature = applicant_aligned.columns[i]
+        value = applicant_aligned.iloc[0, i]
+        shap_val = shap_values.values[0][i]
+        explanation_text += f"- {feature} = {value} contributed {'positively' if shap_val > 0 else 'negatively'} to the risk score.\n"
+
+    # 3. LIME Insights
+    explanation_text += "\n📌 **LIME Explanation:**\n"
+    for feature, weight in lime_exp.as_list(label=1):
+        explanation_text += f"- {feature} with weight {weight:.2f}\n"
+
+    # 4. Policy & Loan Advice
+    explanation_text += "\n💡 **Policy Recommendations:**\n"
+    if pred[0] == 0:  # Non-default
+        explanation_text += "- The applicant qualifies for a personal loan.\n"
+        if prob[0] < 0.3:
+            explanation_text += "- Recommended: Higher loan amount with longer repayment period (24–36 months).\n"
+        elif prob[0] < 0.6:
+            explanation_text += "- Recommended: Medium loan amount with repayment period of 12–24 months.\n"
+        else:
+            explanation_text += "- Recommended: Lower loan amount with strict monitoring and shorter repayment period (6–12 months).\n"
+    else:
+        explanation_text += "- The applicant should be carefully monitored or rejected due to high risk of default.\n"
+        explanation_text += "- Recommend financial literacy training or credit repair program before loan approval.\n"
+
+    return explanation_text
+
+
+# Load model, scaler, dataset, and feature names
 mlp_model = joblib.load("mlp_model.pkl")
 scaler = joblib.load("scaler.pkl")
 df = pd.read_csv("credit_risk_dataset.csv")
 feature_names = joblib.load("features.pkl")
 
-# --- SHAP Global Importance: Top 10 Features ---
-X = df.drop("default_ind", axis=1)
-explainer = shap.Explainer(mlp_model.predict, scaler.transform(X))
-shap_values_global = explainer(scaler.transform(X))
-shap_mean_importance = np.abs(shap_values_global.values).mean(axis=0)
-top_features = X.columns[np.argsort(shap_mean_importance)[-10:][::-1]].tolist()
+st.title("📊 Credit Risk Assessment Tool")
 
-st.title("📊 Credit Risk Assessment Tool (Enhanced)")
+# Sidebar options
+st.sidebar.header("Applicant Data Input")
 
-# Initialize session state
-if "applicants" not in st.session_state:
-    st.session_state["applicants"] = []
+# Choose input mode
+input_mode = st.sidebar.radio("Choose input mode:", ["Manual Entry", "Upload CSV"])
 
-# --- Applicant Form for Top 10 Features ---
-st.sidebar.header("Enter Applicant Data (Top 10 Features)")
-applicant_input = {}
+applicant_data = None
+if input_mode == "Manual Entry":
+    income = st.sidebar.number_input("Income", min_value=0.0, step=100.0)
+    age = st.sidebar.number_input("Age", min_value=18, max_value=100, step=1)
+    loan_amount = st.sidebar.number_input("Loan Amount", min_value=0.0, step=100.0)
+    credit_score = st.sidebar.number_input("Credit Score", min_value=300, max_value=850, step=1)
 
-for feat in top_features:
-    if pd.api.types.is_numeric_dtype(df[feat]):
-        applicant_input[feat] = st.sidebar.number_input(f"{feat}", 
-                                                        min_value=float(df[feat].min()), 
-                                                        max_value=float(df[feat].max()), 
-                                                        value=float(df[feat].median()))
-    else:
-        applicant_input[feat] = st.sidebar.selectbox(f"{feat}", df[feat].unique())
+    applicant_data = pd.DataFrame({
+        "income": [income],
+        "age": [age],
+        "loan_amount": [loan_amount],
+        "credit_score": [credit_score]
+    })
 
-# Add applicant to session
-if st.sidebar.button("Add Applicant"):
-    st.session_state["applicants"].append(applicant_input.copy())
-    st.sidebar.success(f"Applicant #{len(st.session_state['applicants'])} added!")
+elif input_mode == "Upload CSV":
+    uploaded_file = st.sidebar.file_uploader("Upload Applicant CSV", type=["csv"])
+    if uploaded_file:
+        applicant_data = pd.read_csv(uploaded_file)
 
-# --- Run Predictions when at least 3 applicants ---
-if len(st.session_state["applicants"]) >= 3:
-    if st.sidebar.button("Run Predictions"):
-        applicants_df = pd.DataFrame(st.session_state["applicants"])
-
-        # Align and scale
+# -------------------- PREDICT BUTTON --------------------
+if st.sidebar.button("Predict"):
+    if applicant_data is not None:
+        # Align applicant data with training features
         applicant_aligned = pd.DataFrame(columns=feature_names)
-        for i, row in applicants_df.iterrows():
-            applicant_aligned.loc[i] = 0
-            for col in row.index:
-                if col in applicant_aligned.columns:
-                    applicant_aligned.loc[i, col] = row[col]
+        applicant_aligned.loc[0] = 0
+        for col in applicant_data.columns:
+            if col in applicant_aligned.columns:
+                applicant_aligned.loc[0, col] = applicant_data[col].values[0]
 
+        # Scale aligned data
         scaled = scaler.transform(applicant_aligned)
 
-        # Predictions
+        # Prediction
         prob = mlp_model.predict_proba(scaled)[:, 1]
         pred = mlp_model.predict(scaled)
 
+        # Results
         results = []
         for i in range(len(prob)):
             if prob[i] > 0.7:
@@ -72,51 +107,66 @@ if len(st.session_state["applicants"]) >= 3:
             else:
                 risk = "Low Risk"
             results.append({
-                "Applicant": i+1,
                 "Prediction": "Default" if pred[i] == 1 else "Non-Default",
                 "Probability of Default": prob[i],
                 "Risk Category": risk
             })
 
         results_df = pd.DataFrame(results)
-        st.subheader("📋 Applicant Comparison")
+        st.subheader("Prediction Results")
         st.write(results_df)
 
-        # --- Risk Distribution Chart ---
-        st.subheader("📊 Risk Distribution")
+        # ✅ SHAP Explanation
+        st.subheader("SHAP Explanation")
+        explainer = shap.Explainer(mlp_model.predict, scaler.transform(df.drop("default_ind", axis=1)))
+        shap_values = explainer(scaled)
         fig, ax = plt.subplots()
-        results_df["Risk Category"].value_counts().plot.pie(autopct="%1.1f%%", ax=ax)
+        shap.summary_plot(shap_values, applicant_aligned, feature_names=feature_names, plot_type="bar", show=False)
         st.pyplot(fig)
 
-        # --- Loan Simulator ---
-        st.subheader("⚡ Loan Simulator (What-If Analysis)")
-        applicant_choice = st.selectbox("Choose applicant to simulate:", results_df["Applicant"])
-        new_loan = st.slider("Adjust Loan Amount", 
-                             min_value=1000, max_value=50000, step=5000)
-
-        sim_data = applicant_aligned.loc[applicant_choice-1].copy()
-        if "loan_amount" in sim_data.index:
-            sim_data["loan_amount"] = new_loan
-        sim_scaled = scaler.transform([sim_data])
-        sim_prob = mlp_model.predict_proba(sim_scaled)[:, 1][0]
-        st.write(f"New predicted default probability: **{sim_prob:.2f}**")
-
-        # --- SHAP Global Feature Importance ---
-        st.subheader("🔍 Global Feature Importance")
-        fig, ax = plt.subplots()
-        shap.summary_plot(shap_values_global, X, feature_names=X.columns, plot_type="bar", show=False)
+        # ✅ LIME Explanation
+        st.subheader("LIME Explanation")
+        lime_explainer = lime.lime_tabular.LimeTabularExplainer(
+            training_data=scaler.transform(df.drop("default_ind", axis=1).values),
+            feature_names=df.drop("default_ind", axis=1).columns.tolist(),
+            class_names=["Non-Default", "Default"],
+            mode="classification"
+        )
+        explanation = lime_explainer.explain_instance(
+            data_row=scaled[0],
+            predict_fn=mlp_model.predict_proba,
+            num_features=4
+        )
+        fig = explanation.as_pyplot_figure(label=1)
         st.pyplot(fig)
 
-        # --- Export Option ---
-        buffer = io.BytesIO()
-        results_df.to_csv(buffer, index=False)
-        st.download_button("⬇️ Download Results CSV", buffer, "credit_risk_results.csv", "text/csv")
+        # ✅ AI Assistant Advice
+        st.subheader("🤖 AI Assistant Advice")
+        assistant_text = ai_assistant(pred, prob, shap_values, explanation, applicant_aligned)
+        st.write(assistant_text)
 
-        # --- Applicant History ---
-        st.subheader("🕒 Applicant History")
-        st.write(pd.DataFrame(st.session_state["applicants"]))
-else:
-    st.info("Add at least 3 applicants to run predictions.")
+    else:
+        st.warning("Please provide applicant data (manual entry or CSV).")
+
+# -------------------- RETRAIN OPTION --------------------
+if st.sidebar.button("Retrain Model"):
+    from sklearn.neural_network import MLPClassifier
+
+    X = df.drop("default_ind", axis=1)
+    y = df["default_ind"]
+
+    scaler.fit(X)
+    X_scaled = scaler.transform(X)
+
+    mlp_model = MLPClassifier(hidden_layer_sizes=(100, 50), max_iter=1000, random_state=42)
+    mlp_model.fit(X_scaled, y)
+
+    joblib.dump(mlp_model, "mlp_model.pkl")
+    joblib.dump(scaler, "scaler.pkl")
+
+    st.success("Model retrained successfully with updated dataset!")
+
+
 
 
 
